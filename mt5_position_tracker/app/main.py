@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 import time
 import logging
+import threading
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -159,16 +160,35 @@ def get_positions():
         logger.error(f"Error in get_positions: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+# Global variable to store the latest BTC price
+latest_btc_price = None
+price_lock = threading.Lock()
+
+def fetch_btc_price_continuously():
+    """Background task to continuously fetch BTC price"""
+    global latest_btc_price
+    while True:
+        try:
+            response = requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT')
+            if response.status_code == 200:
+                with price_lock:
+                    latest_btc_price = float(response.json()['price'])
+                logger.debug(f"Updated BTC price: {latest_btc_price}")
+        except Exception as e:
+            logger.error(f"Error fetching BTC price: {e}")
+        time.sleep(0.1)  # 100ms delay between requests
+
 @app.route('/btc-price')
 def get_btc_price():
-    """Get current BTC price from Binance"""
-    try:
-        response = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT")
-        data = response.json()
-        return jsonify({"price": data["price"]})
-    except Exception as e:
-        logger.error(f"Error fetching BTC price: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+    """Get the latest BTC price"""
+    with price_lock:
+        if latest_btc_price is None:
+            return jsonify({'error': 'BTC price not available yet'}), 503
+        return jsonify({'price': latest_btc_price})
+
+# Start the background thread for BTC price updates
+btc_price_thread = threading.Thread(target=fetch_btc_price_continuously, daemon=True)
+btc_price_thread.start()
 
 # Cleanup MT5 connection when the application exits
 import atexit
