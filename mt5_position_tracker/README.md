@@ -1,15 +1,15 @@
 # MT5 Position Tracker
 
-A full-stack application that tracks and displays opened positions from MetaTrader 5 using FastAPI, SQLite, and a modern UI built with Tailwind CSS and DaisyUI.
+A full-stack application that tracks and displays opened positions from MetaTrader 5 using Flask, SQLite, and a modern UI.
 
 ## Features
 
 - Real-time position tracking from MT5
-- Beautiful and responsive UI
 - Position history tracking
 - Auto-refresh functionality
-- Position type categorization (bullish/bearish)
+- Position type categorization
 - Detailed position information display
+- Current BTC price tracking from Binance
 
 ## Prerequisites
 
@@ -31,29 +31,38 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+4. Create a `.env` file with your MT5 credentials:
+```
+MT5_LOGIN=your_login
+MT5_PASSWORD=your_password
+MT5_SERVER=your_server
+```
+
 ## Running the Application
 
 1. Make sure MetaTrader 5 is running and you're logged in
-2. Start the FastAPI server:
+2. Start the Flask server:
 ```bash
-uvicorn app.main:app --reload
+python -m app.main
 ```
 
-3. Open your browser and navigate to `http://localhost:8000`
+3. Open your browser and navigate to `http://localhost:5000`
 
 ## API Endpoints
 
 - `GET /`: Main application interface
-- `GET /positions/`: Get all currently opened positions
-- `GET /positions/history`: Get position history (including closed positions)
+- `GET /positions`: Get all currently opened positions
+- `GET /btc-price`: Get current BTC price from Binance
 
 ## Tech Stack
 
-- Backend: FastAPI
+- Backend: Flask
 - Database: SQLite
-- Frontend: HTML, Tailwind CSS, DaisyUI
-- Trading Platform Integration: MetaTrader 5 Python package
+- External APIs: MetaTrader5, Binance
+- Dependencies: See requirements.txt for full list
 
-## License
+## Environment Variables
 
-MIT
+- `MT5_LOGIN`: Your MetaTrader 5 account login
+- `MT5_PASSWORD`: Your MetaTrader 5 account password
+- `MT5_SERVER`: Your MetaTrader 5 server name
