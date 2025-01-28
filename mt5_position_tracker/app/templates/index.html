@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .position-card {
+            transition: transform 0.2s;
+        }
+        .position-card:hover {
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+    <div class="max-w-7xl mx-auto">
+        <!-- Bitcoin Price Chart -->
+        <div class="bg-white rounded-lg shadow-lg p-4 mb-6">
+            <h2 class="text-2xl font-bold mb-4">Bitcoin Price</h2>
+            <div id="btc-price" class="text-3xl font-bold text-blue-600 mb-4">
+                Loading...
+            </div>
+            <div id="price-chart" style="height: 400px;"></div>
+        </div>
+
+        <!-- Positions Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow-lg p-4">
+                <h3 class="text-lg font-semibold mb-2">Total Positions</h3>
+                <p class="text-3xl font-bold" id="total-positions">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-4">
+                <h3 class="text-lg font-semibold mb-2">Bullish Positions</h3>
+                <p class="text-3xl font-bold text-green-600" id="bullish-positions">0</p>
+            </div>
+            <div class="bg-white rounded-lg shadow-lg p-4">
+                <h3 class="text-lg font-semibold mb-2">Bearish Positions</h3>
+                <p class="text-3xl font-bold text-red-600" id="bearish-positions">0</p>
+            </div>
+        </div>
+
+        <!-- Position Details -->
+        <div class="bg-white rounded-lg shadow-lg p-4">
+            <h2 class="text-2xl font-bold mb-4">Open Positions</h2>
+            <div id="positions-container"></div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize price history array with a maximum size
+        const MAX_POINTS = 50;  // Reduced from 100 to 50 for cleaner visualization
+        let priceHistory = [];
+        let timeHistory = [];
+
+        function formatPrice(price) {
+            return parseFloat(price).toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        function updateBitcoinPrice() {
+            fetch('/btc-price')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error fetching BTC price:', data.error);
+                        return;
+                    }
+
+                    const price = parseFloat(data.price);
+                    document.getElementById('btc-price').textContent = `$${formatPrice(price)}`;
+                    
+                    // Update price history
+                    const now = new Date();
+                    priceHistory.push(price);
+                    timeHistory.push(now);
+                    
+                    // Keep only last MAX_POINTS points
+                    if (priceHistory.length > MAX_POINTS) {
+                        priceHistory = priceHistory.slice(-MAX_POINTS);
+                        timeHistory = timeHistory.slice(-MAX_POINTS);
+                    }
+                    
+                    // Update chart
+                    const trace = {
+                        x: timeHistory,
+                        y: priceHistory,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'BTC Price',
+                        line: {
+                            color: '#2563eb',
+                            width: 2,
+                            shape: 'spline'  // Smoothed line
+                        }
+                    };
+                    
+                    const layout = {
+                        showlegend: false,
+                        margin: { t: 20, r: 20, l: 50, b: 40 },
+                        xaxis: {
+                            title: 'Time',
+                            showgrid: true,
+                            gridcolor: '#f3f4f6',
+                            tickformat: '%H:%M:%S',
+                            nticks: 10
+                        },
+                        yaxis: {
+                            title: 'Price (USD)',
+                            showgrid: true,
+                            gridcolor: '#f3f4f6',
+                            tickformat: ',.2f'
+                        },
+                        plot_bgcolor: 'white',
+                        paper_bgcolor: 'white'
+                    };
+
+                    const config = {
+                        responsive: true,
+                        displayModeBar: false
+                    };
+                    
+                    Plotly.newPlot('price-chart', [trace], layout, config);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function updatePositions() {
+            fetch('/positions')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error fetching positions:', data.error);
+                        return;
+                    }
+
+                    // Update position counts
+                    document.getElementById('total-positions').textContent = data.length;
+                    document.getElementById('bullish-positions').textContent = data.filter(p => p.type === 'bullish').length;
+                    document.getElementById('bearish-positions').textContent = data.filter(p => p.type === 'bearish').length;
+                    
+                    // Update position details
+                    const container = document.getElementById('positions-container');
+                    if (data.length === 0) {
+                        container.innerHTML = '<p class="text-gray-500 text-center py-4">No open positions</p>';
+                        return;
+                    }
+
+                    container.innerHTML = data.map(position => `
+                        <div class="position-card bg-gray-50 p-4 rounded-lg mb-4 border-l-4 ${position.type === 'bullish' ? 'border-green-500' : 'border-red-500'}">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-lg font-semibold">${position.symbol}</h3>
+                                <span class="px-3 py-1 rounded-full ${position.type === 'bullish' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                    ${position.type}
+                                </span>
+                            </div>
+                            <div class="mt-2 grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-sm text-gray-600">Volume</p>
+                                    <p class="font-semibold">${position.volume}</p>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-600">Price</p>
+                                    <p class="font-semibold">$${formatPrice(position.price)}</p>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-sm text-gray-500">
+                                Opened: ${new Date(position.time).toLocaleString()}
+                            </div>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        // Initial updates
+        updateBitcoinPrice();
+        updatePositions();
+
+        // Update every 5 seconds
+        setInterval(updateBitcoinPrice, 5000);
+        setInterval(updatePositions, 5000);
+    </script>
+</body>
+</html>
